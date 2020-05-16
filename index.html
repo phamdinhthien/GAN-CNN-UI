@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAN CNN</title>
+    <link rel="stylesheet" href="./library/css/bootstrap.min.css">
+    <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"
+        integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+    <link rel="shortcut icon" type="image/png" href="./favicon.png" />
+    <style>
+        body {
+            padding: 0 20px;
+        }
+
+        .container-fluid {
+            box-shadow: 0 0 12px 0 hsla(0, 0%, 47.5%, .45);
+            padding: 20px;
+            border-radius: 0.25em;
+            min-height: calc(100vh - 50px);
+            margin-bottom: 20px;
+        }
+
+        .origin-img,
+        #processed-img {
+            width: 100%;
+            height: auto;
+        }
+
+        .origin-img img,
+        #processed-img img {
+            width: 100%;
+            height: auto;
+        }
+
+        .loading-layer {
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            z-index: 99;
+            background: #00000029;
+            top: 0;
+            left: 0;
+        }
+
+        .loading-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .overflow-hidden{
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center">
+                <select class="form-control mr-2" id="filter-effect" style="width:150px;" name="filter-effect">
+                    <option selected="selected" value="vangogh">Vangogh</option>
+                    <option value="cezanne">Cezanne</option>
+                    <option value="ukiyo-e">Ukiyo-e</option>
+                    <option value="monet">Monet</option>
+                    <option value="dali">Dali</option>
+                </select>
+                <button type="button" class="btn btn-primary mr-2" style="height:37px;" id="btn-upload-photo"><i
+                        class="fa fa-upload"></i> Upload your photo</button>
+                <input type="file" name="upload-photo" id="input-upload-photo" class="d-none">
+                <button type="button" class="btn btn-primary" style="height:37px;display: none;"
+                    id="btn-convert-photo"><i class="fa fa-cogs"></i>
+                    Convert</button>
+            </div>
+            <button type="button" class="btn btn-primary" style="height:37px;display: none;" id="btn-download-photo"><i
+                    class="fa fa-download"></i>
+                Download</button>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <span class="d-inline-block">Your photo</span>
+                <hr class="mb-3 mt-2">
+                <div class="origin-img">
+                    <img src="./images/real-photo-sample.png" alt="" id="o-img">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <span class="d-inline-block">Processed photo</span>
+                <hr class="mb-3 mt-2">
+                <div id="processed-img">
+                    <img src="./images/fake-photo-sample.png" alt="" id="p-img">
+                </div>
+            </div>
+        </div>
+        <div class="loading-layer d-none">
+            <div class="loading-icon">
+                <div class="spinner-grow text-primary"></div>
+            </div>
+        </div>
+    </div>
+    <script src="./library/scripts/jquery-3.4.1.min.js"></script>
+    <script>
+        var selectedFile = null;
+        var base64Url = null;
+        $(document).ready(function () {
+            initEvents();
+        })
+
+        function initEvents() {
+            $("#btn-upload-photo").click(function () {
+                $("#input-upload-photo").click();
+            })
+            $("#input-upload-photo").change(function (e) {
+                renderSelectedPhoto(this);
+                $("#btn-convert-photo").show();
+            })
+
+            $("#btn-convert-photo").click(function () {
+                convertPhoto(selectedFile, $("#filter-effect").val());
+            });
+
+            $("#btn-download-photo").click(function () {
+                downloadPhoto(base64Url);
+            })
+        }
+
+        function renderSelectedPhoto(input) {
+            if (input.files && input.files[0]) {
+                selectedFile = input.files[0];
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('.origin-img #o-img').attr('src', e.target.result);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function showConvertedPhoto(base64String) {
+            $(".loading-layer").addClass("d-none");
+            // $("body").removeClass("overflow-hidden");
+            var img =$("#processed-img #p-img");
+            base64Url = "data:image/png;base64," + base64String;
+            img.attr("src", base64Url);
+            img.attr("style", `width:${$(".origin-img #o-img").width()}px;height:${$(".origin-img #o-img").height()}px;`);
+            $("#processed-img").html(img);
+            $("#btn-download-photo").show();
+        }
+
+        function convertPhoto(imageFile, style) { 
+            $(".loading-layer").removeClass("d-none");
+            // $("body").addClass("overflow-hidden");
+            var data = new FormData();
+            data.append("image", imageFile);
+            data.append("style", style);
+            $.ajax({
+                url: 'https://gan-cnn.herokuapp.com/stylized/',
+                type: 'POST',
+                async: true,
+                enctype: 'multipart/form-data',
+                processData: false,
+                contentType: false,
+                cache: false,
+                data: (data)
+            }).done(function (res) {
+                showConvertedPhoto(res)
+            }).fail(function (err) {
+                convertPhoto(imageFile, style);
+            });
+        }
+
+        function downloadPhoto(url) {
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = "myImage.png";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+
+</html>
